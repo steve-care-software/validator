@@ -11,7 +11,7 @@ import (
 )
 
 type application struct {
-	grammarAdapter 						grammars.Adapter
+	grammarAdapter                      grammars.Adapter
 	resultBuilder                       results.Builder
 	resultTokenBuilder                  results.TokenBuilder
 	resultBlockBuilder                  results.BlockBuilder
@@ -30,7 +30,7 @@ func createApplication(
 	resultElementBuilder results.ElementBuilder,
 ) Application {
 	out := application{
-		grammarAdapter: 					 grammarAdapter,
+		grammarAdapter:                      grammarAdapter,
 		resultBuilder:                       resultBuilder,
 		resultTokenBuilder:                  resultTokenBuilder,
 		resultBlockBuilder:                  resultBlockBuilder,
