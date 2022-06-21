@@ -48,12 +48,7 @@ func (app *application) Compile(script string) (grammars.Grammar, error) {
 }
 
 // Execute executes the application
-func (app *application) Execute(script string, data []byte, canHavePrefix bool) (results.Result, error) {
-	grammar, err := app.Compile(script)
-	if err != nil {
-		return nil, err
-	}
-
+func (app *application) Execute(grammar grammars.Grammar, data []byte, canHavePrefix bool) (results.Result, error) {
 	token := grammar.Root()
 	channels := grammar.Channels()
 	if canHavePrefix {

@@ -29,7 +29,14 @@ func TestValidator_withReference_withSuccessIndex_withChannels_isSuccess(t *test
 	`
 
 	data := []byte("(*( 5 *< 5 )+) 567")
-	result, err := NewApplication().Execute(script, data, true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := NewApplication().Execute(grammar, data, true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -68,7 +75,14 @@ func TestValidator_withReference_withSuccessIndex_isSuccess(t *testing.T) {
 	`
 
 	data := []byte("((5<5))567")
-	result, err := NewApplication().Execute(script, data, true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, data, true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -107,7 +121,14 @@ func TestValidator_withReference_withSuccessIndex_notEnoughData_cannotHavePrefix
 	`
 
 	data := []byte("((5<5)")
-	result, err := NewApplication().Execute(script, data, false)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, data, false)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -152,7 +173,14 @@ func TestValidator_withReference_withSuccessIndex_notEnoughData_withPrefix_isSuc
 	`
 
 	data := []byte("((5<5)")
-	result, err := NewApplication().Execute(script, data, true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, data, true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -190,7 +218,14 @@ func TestValidator_withReference_isInfiniteRecursive_isNotSuccess(t *testing.T) 
 	`
 
 	data := []byte("((5<5))")
-	result, err := NewApplication().Execute(script, data, true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, data, true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -225,7 +260,14 @@ func TestValidator_withOneLine_withSpecificCardinality_withSubTokens_withSuccess
 	`
 
 	data := []byte("(-)345")
-	result, err := NewApplication().Execute(script, data, true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, data, true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -257,7 +299,14 @@ func TestValidator_withOneLine_withSpecificCardinality_withByte_withoutSuccessIn
 		openParenthesis : $40;
 	`
 
-	result, err := NewApplication().Execute(script, []byte("("), true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, []byte("("), true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -289,7 +338,14 @@ func TestValidator_withOneLine_withMinimumCardinality_withByte_withExactlyMinOcc
 		openParenthesis : $40[2,];
 	`
 
-	result, err := NewApplication().Execute(script, []byte("(("), true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, []byte("(("), true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -320,7 +376,14 @@ func TestValidator_withOneLine_withMinimumCardinality_withByte_withMinimumPlusOc
 		openParenthesis : $40[2,];
 	`
 
-	result, err := NewApplication().Execute(script, []byte("((("), true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, []byte("((("), true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -351,7 +414,14 @@ func TestValidator_withOneLine_withMinimumCardinality_withByte_withLessThanMinim
 		openParenthesis : $40[2,];
 	`
 
-	result, err := NewApplication().Execute(script, []byte("("), true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, []byte("("), true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -382,7 +452,14 @@ func TestValidator_withOneLine_withRangeCardinality_withByte_withMaximumExcceede
 		openParenthesis : $40[2,5];
 	`
 
-	result, err := NewApplication().Execute(script, []byte("(((((("), true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, []byte("(((((("), true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -419,7 +496,14 @@ func TestValidator_withOneLine_withRangeCardinality_withByte_withExactlyMaximumO
 		openParenthesis : $40[2,5];
 	`
 
-	result, err := NewApplication().Execute(script, []byte("((((("), true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, []byte("((((("), true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -450,7 +534,14 @@ func TestValidator_withOneLine_withRangeCardinality_withByte_withinRangeOccurenc
 		openParenthesis : $40[2,5];
 	`
 
-	result, err := NewApplication().Execute(script, []byte("(((("), true)
+	application := NewApplication()
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	result, err := application.Execute(grammar, []byte("(((("), true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
