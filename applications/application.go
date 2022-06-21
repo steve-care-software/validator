@@ -42,9 +42,14 @@ func createApplication(
 	return &out
 }
 
+// Compile compiles a script to a validator grammar
+func (app *application) Compile(script string) (grammars.Grammar, error) {
+	return app.grammarAdapter.ToGrammar(script)
+}
+
 // Execute executes the application
 func (app *application) Execute(script string, data []byte, canHavePrefix bool) (results.Result, error) {
-	grammar, err := app.grammarAdapter.ToGrammar(script)
+	grammar, err := app.Compile(script)
 	if err != nil {
 		return nil, err
 	}

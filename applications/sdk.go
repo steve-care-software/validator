@@ -27,5 +27,6 @@ func NewApplication() Application {
 
 // Application represents the grammar application
 type Application interface {
+	Compile(script string) (grammars.Grammar, error)
 	Execute(script string, data []byte, canHavePrefix bool) (results.Result, error)
 }
