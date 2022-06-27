@@ -46,12 +46,17 @@ func createAdapter(
 // ToCardinality converts a script to a cardinality instance
 func (app *adapter) ToCardinality(script string) (Cardinality, []byte, error) {
 	input := []byte(script)
+	builder := app.builder.Create()
 	if len(input) <= 0 {
-		return nil, nil, errors.New("the input was NOT expected to be empty while fetching the element's cardinality")
+		ins, err := builder.WithMinimum(1).WithMaximum(1).Now()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return ins, []byte{}, nil
 	}
 
 	remaining := input
-	builder := app.builder.Create()
 	if input[0] == app.nonZeroMultiple {
 		builder.WithMinimum(1)
 		remaining = input[1:]
