@@ -3,11 +3,11 @@ package grammars
 import (
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/steve-care-software/validator/domain/grammars/cardinality"
 	"github.com/steve-care-software/validator/domain/grammars/channels"
 	"github.com/steve-care-software/validator/domain/grammars/tokens"
+	"github.com/steve-care-software/validator/domain/utils"
 )
 
 type adapter struct {
@@ -20,7 +20,7 @@ type adapter struct {
 	lineBuilder                   tokens.LineBuilder
 	elementWithCardinalityBuilder tokens.ElementWithCardinalityBuilder
 	elementBuilder                tokens.ElementBuilder
-	cardinalityBuilder            cardinality.Builder
+	cardinalityAdapter            cardinality.Adapter
 	rootPrefix                    byte
 	rootSuffix                    byte
 	channelPrefix                 byte
@@ -33,15 +33,8 @@ type adapter struct {
 	linesPrefix                   byte
 	linesSuffix                   byte
 	lineDelimiter                 byte
-	cardinalityNonZeroMultiple    byte
-	cardinalityZeroMultiple       byte
-	cardinalityOptional           byte
-	cardinalityRangePrefix        byte
-	cardinalityRangeSuffix        byte
-	cardinalityRangeSeparator     byte
 	commentPrefix                 byte
 	commentSuffix                 byte
-	numbersCharacters             []byte
 	tokenNameCharacters           []byte
 	channelCharacters             []byte
 }
@@ -56,7 +49,7 @@ func createAdapter(
 	lineBuilder tokens.LineBuilder,
 	elementWithCardinalityBuilder tokens.ElementWithCardinalityBuilder,
 	elementBuilder tokens.ElementBuilder,
-	cardinalityBuilder cardinality.Builder,
+	cardinalityAdapter cardinality.Adapter,
 	rootPrefix byte,
 	rootSuffix byte,
 	channelPrefix byte,
@@ -69,15 +62,8 @@ func createAdapter(
 	linesPrefix byte,
 	linesSuffix byte,
 	lineDelimiter byte,
-	cardinalityNonZeroMultiple byte,
-	cardinalityZeroMultiple byte,
-	cardinalityOptional byte,
-	cardinalityRangePrefix byte,
-	cardinalityRangeSuffix byte,
-	cardinalityRangeSeparator byte,
 	commentPrefix byte,
 	commentSuffix byte,
-	numbersCharacters []byte,
 	tokenNameCharacters []byte,
 	channelCharacters []byte,
 ) Adapter {
@@ -91,7 +77,7 @@ func createAdapter(
 		lineBuilder:                   lineBuilder,
 		elementWithCardinalityBuilder: elementWithCardinalityBuilder,
 		elementBuilder:                elementBuilder,
-		cardinalityBuilder:            cardinalityBuilder,
+		cardinalityAdapter:            cardinalityAdapter,
 		rootPrefix:                    rootPrefix,
 		rootSuffix:                    rootSuffix,
 		channelPrefix:                 channelPrefix,
@@ -104,15 +90,8 @@ func createAdapter(
 		linesPrefix:                   linesPrefix,
 		linesSuffix:                   linesSuffix,
 		lineDelimiter:                 lineDelimiter,
-		cardinalityNonZeroMultiple:    cardinalityNonZeroMultiple,
-		cardinalityZeroMultiple:       cardinalityZeroMultiple,
-		cardinalityOptional:           cardinalityOptional,
-		cardinalityRangePrefix:        cardinalityRangePrefix,
-		cardinalityRangeSuffix:        cardinalityRangeSuffix,
-		cardinalityRangeSeparator:     cardinalityRangeSeparator,
 		commentPrefix:                 commentPrefix,
 		commentSuffix:                 commentSuffix,
-		numbersCharacters:             numbersCharacters,
 		tokenNameCharacters:           tokenNameCharacters,
 		channelCharacters:             channelCharacters,
 	}
@@ -483,7 +462,7 @@ func (app *adapter) fetchValue(input []byte) (*scriptValue, []byte, error) {
 		return nil, nil, err
 	}
 
-	cardinality, remainingAfterCardinality, err := app.fetchCardinality(remaining)
+	cardinality, remainingAfterCardinality, err := app.cardinalityAdapter.ToCardinality(string(remaining))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -495,116 +474,13 @@ func (app *adapter) fetchValue(input []byte) (*scriptValue, []byte, error) {
 	}, remainingAfterCardinality, nil
 }
 
-func (app *adapter) fetchCardinality(input []byte) (cardinality.Cardinality, []byte, error) {
-	if len(input) <= 0 {
-		return nil, nil, errors.New("the input was NOT expected to be empty while fetching the element's cardinality")
-	}
-
-	remaining := input
-	builder := app.cardinalityBuilder.Create()
-	if input[0] == app.cardinalityNonZeroMultiple {
-		builder.WithMinimum(1)
-		remaining = input[1:]
-	}
-
-	if input[0] == app.cardinalityZeroMultiple {
-		builder.WithMinimum(0)
-		remaining = input[1:]
-	}
-
-	if input[0] == app.cardinalityOptional {
-		builder.WithMinimum(0).WithMaximum(1)
-		remaining = input[1:]
-	}
-
-	if input[0] == app.cardinalityRangePrefix {
-		pMin, pMax, retRemaining, err := app.fetchCardinalityRange(input[1:])
-		if err != nil {
-			return nil, nil, err
-		}
-
-		builder.WithMinimum(*pMin)
-		if pMax != nil {
-			builder.WithMaximum(*pMax)
-		}
-
-		remaining = retRemaining
-	}
-
-	ins, err := builder.Now()
-	if err != nil {
-		ins, err = builder.WithMinimum(1).WithMaximum(1).Now()
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	return ins, remaining, nil
-}
-
-func (app *adapter) fetchCardinalityRange(input []byte) (*uint8, *uint8, []byte, error) {
-	pFirstNumber, isSpecific, retRemaining, err := app.fetchFirstNumberInRange(input)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	if isSpecific {
-		return pFirstNumber, nil, retRemaining, nil
-	}
-
-	pSecondNumber, _, retRemainingAfterMax, _ := app.fetchFirstNumberInRange(retRemaining)
-	return pFirstNumber, pSecondNumber, retRemainingAfterMax, nil
-}
-
-func (app *adapter) fetchFirstNumberInRange(input []byte) (*uint8, bool, []byte, error) {
-	if len(input) <= 0 {
-		return nil, false, nil, errors.New("the input was NOT expected to be empty while fetching the element's cardinality range number (min/max)")
-	}
-
-	isSpecific := true
-	numberBytes := []byte{}
-	for _, oneInputByte := range input {
-		if oneInputByte == app.cardinalityRangeSeparator {
-			isSpecific = false
-			break
-		}
-
-		if oneInputByte == app.cardinalityRangeSuffix {
-			break
-		}
-
-		if !app.isBytePresent(oneInputByte, app.numbersCharacters) {
-			return nil, false, nil, errors.New("the input elements within a range must be numbers")
-		}
-
-		numberBytes = append(numberBytes, oneInputByte)
-	}
-
-	if len(numberBytes) <= 0 {
-		return nil, false, input[1:], nil
-	}
-
-	intNumber, err := strconv.Atoi(string(numberBytes))
-	if err != nil {
-		return nil, false, nil, err
-	}
-
-	if intNumber >= 256 {
-		str := fmt.Sprintf("the elements of a cardinality (range, specific) must contain a maximum value of 256, %d provided", intNumber)
-		return nil, false, nil, errors.New(str)
-	}
-
-	casted := uint8(intNumber)
-	return &casted, isSpecific, input[len(numberBytes)+1:], nil
-}
-
 func (app *adapter) fetchElement(input []byte) (*byte, string, []byte, error) {
 	if len(input) <= 0 {
 		return nil, "", nil, errors.New("the input was NOT expected to be empty while fetching the element")
 	}
 
 	if input[0] == app.bytePrefix {
-		pUint, remaining, err := app.fetchNumber(input[1:])
+		pUint, remaining, err := utils.FetchNumber(input[1:])
 		if err != nil {
 			return nil, "", nil, err
 		}
@@ -634,7 +510,7 @@ func (app *adapter) fetchElement(input []byte) (*byte, string, []byte, error) {
 func (app *adapter) fetchTokenName(input []byte) (string, []byte, error) {
 	nameBytes := []byte{}
 	for _, oneInputByte := range input {
-		if !app.isBytePresent(oneInputByte, app.tokenNameCharacters) {
+		if !utils.IsBytePresent(oneInputByte, app.tokenNameCharacters) {
 			break
 		}
 
@@ -648,45 +524,10 @@ func (app *adapter) fetchTokenName(input []byte) (string, []byte, error) {
 	return string(nameBytes), input[len(nameBytes):], nil
 }
 
-func (app *adapter) fetchNumber(input []byte) (*uint, []byte, error) {
-	indexBytes := []byte{}
-	for _, oneInputByte := range input {
-		if !app.isBytePresent(oneInputByte, app.numbersCharacters) {
-			break
-		}
-
-		indexBytes = append(indexBytes, oneInputByte)
-	}
-
-	if len(indexBytes) <= 0 {
-		return nil, nil, errors.New("the input does not contain a number")
-	}
-
-	intNumber, err := strconv.Atoi(string(indexBytes))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	casted := uint(intNumber)
-	return &casted, input[len(indexBytes):], nil
-}
-
-func (app *adapter) isBytePresent(value byte, data []byte) bool {
-	isPresent := false
-	for _, oneChanByte := range data {
-		if value == oneChanByte {
-			isPresent = true
-			break
-		}
-	}
-
-	return isPresent
-}
-
 func (app *adapter) removeChannelCharacters(input []byte) []byte {
 	output := []byte{}
 	for _, oneInputByte := range input {
-		if app.isBytePresent(oneInputByte, app.channelCharacters) {
+		if utils.IsBytePresent(oneInputByte, app.channelCharacters) {
 			continue
 		}
 

@@ -17,7 +17,7 @@ func NewAdapter() Adapter {
 	lineBuilder := tokens.NewLineBuilder()
 	elementWithCardinalityBuilder := tokens.NewElementWithCardinalityBuilder()
 	elementBuilder := tokens.NewElementBuilder()
-	cardinalityBuilder := cardinality.NewBuilder()
+	cardinalityAdapter := cardinality.NewAdapter()
 	rootPrefix := []byte("%")[0]
 	rootSuffix := []byte(";")[0]
 	channelPrefix := []byte("-")[0]
@@ -30,15 +30,8 @@ func NewAdapter() Adapter {
 	linesPrefix := []byte(":")[0]
 	linesSuffix := []byte(";")[0]
 	lineDelimiter := []byte("|")[0]
-	cardinalityNonZeroMultiple := []byte("+")[0]
-	cardinalityZeroMultiple := []byte("*")[0]
-	cardinalityOptional := []byte("?")[0]
-	cardinalityRangePrefix := []byte("[")[0]
-	cardinalityRangeSuffix := []byte("]")[0]
-	cardinalityRangeSeparator := []byte(",")[0]
 	commentPrefix := []byte(";")[0]
 	commentSuffix := []byte(";")[0]
-	numbersCharacters := []byte("0123456789")
 	tokenNameCharacters := []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	channelCharacters := []byte{
 		[]byte("\t")[0],
@@ -57,7 +50,7 @@ func NewAdapter() Adapter {
 		lineBuilder,
 		elementWithCardinalityBuilder,
 		elementBuilder,
-		cardinalityBuilder,
+		cardinalityAdapter,
 		rootPrefix,
 		rootSuffix,
 		channelPrefix,
@@ -70,15 +63,8 @@ func NewAdapter() Adapter {
 		linesPrefix,
 		linesSuffix,
 		lineDelimiter,
-		cardinalityNonZeroMultiple,
-		cardinalityZeroMultiple,
-		cardinalityOptional,
-		cardinalityRangePrefix,
-		cardinalityRangeSuffix,
-		cardinalityRangeSeparator,
 		commentPrefix,
 		commentSuffix,
-		numbersCharacters,
 		tokenNameCharacters,
 		channelCharacters,
 	)
