@@ -4,35 +4,44 @@ type element struct {
 	pByte     *byte
 	token     Token
 	reference string
+	external  string
 }
 
 func createElementWithByte(
 	pByte *byte,
 ) Element {
-	return createElementInternally(pByte, nil, "")
+	return createElementInternally(pByte, nil, "", "")
 }
 
 func createElementWithToken(
 	token Token,
 ) Element {
-	return createElementInternally(nil, token, "")
+	return createElementInternally(nil, token, "", "")
 }
 
 func createElementWithReference(
 	reference string,
 ) Element {
-	return createElementInternally(nil, nil, reference)
+	return createElementInternally(nil, nil, reference, "")
+}
+
+func createElementWithExternal(
+	external string,
+) Element {
+	return createElementInternally(nil, nil, "", external)
 }
 
 func createElementInternally(
 	pByte *byte,
 	token Token,
 	reference string,
+	external string,
 ) Element {
 	out := element{
 		pByte:     pByte,
 		token:     token,
 		reference: reference,
+		external:  external,
 	}
 
 	return &out
@@ -66,4 +75,14 @@ func (obj *element) IsReference() bool {
 // Reference returns the reference, if any
 func (obj *element) Reference() string {
 	return obj.reference
+}
+
+// IsExternal returns true if there is an external token, false otherwise
+func (obj *element) IsExternal() bool {
+	return obj.external != ""
+}
+
+// External returns the external, if any
+func (obj *element) External() string {
+	return obj.external
 }

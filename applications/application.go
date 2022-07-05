@@ -51,6 +51,7 @@ func (app *application) Compile(script string) (grammars.Grammar, error) {
 func (app *application) Execute(grammar grammars.Grammar, data []byte, canHavePrefix bool) (results.Result, error) {
 	token := grammar.Root()
 	channels := grammar.Channels()
+	externals := grammar.Externals()
 	if canHavePrefix {
 		index := uint(0)
 		reaminingData := data
@@ -59,7 +60,7 @@ func (app *application) Execute(grammar grammars.Grammar, data []byte, canHavePr
 				break
 			}
 
-			retResultToken, err := app.executeOnce(token, channels, reaminingData, index)
+			retResultToken, err := app.executeOnce(token, externals, channels, reaminingData, index)
 			if err == nil && retResultToken.IsSuccess() {
 				return app.resultBuilder.Create().WithIndex(index).WithToken(retResultToken).Now()
 			}
@@ -69,7 +70,7 @@ func (app *application) Execute(grammar grammars.Grammar, data []byte, canHavePr
 		}
 	}
 
-	retResultToken, err := app.executeOnce(token, channels, data, 0)
+	retResultToken, err := app.executeOnce(token, externals, channels, data, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +80,7 @@ func (app *application) Execute(grammar grammars.Grammar, data []byte, canHavePr
 
 func (app *application) executeOnce(
 	currentToken tokens.Token,
+	externals grammars.Externals,
 	chans channels.Channels,
 	data []byte,
 	index uint,
@@ -88,7 +90,7 @@ func (app *application) executeOnce(
 		channelsList = chans.List()
 	}
 
-	retResultToken, _, err := app.executeToken(currentToken, channelsList, data, map[string]*tokenData{})
+	retResultToken, _, err := app.executeToken(currentToken, externals, channelsList, data, map[string]*tokenData{})
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +99,7 @@ func (app *application) executeOnce(
 }
 
 func (app *application) executeChannels(
+	externals grammars.Externals,
 	channelsList []channels.Channel,
 	currentData []byte,
 	prevTokenData map[string]*tokenData,
@@ -106,13 +109,13 @@ func (app *application) executeChannels(
 		token tokens.Token,
 		previous tokens.Token,
 	) ([]byte, error) {
-		retResToken, _, err := app.executeToken(token, []channels.Channel{}, input, prevTokenData)
+		retResToken, _, err := app.executeToken(token, externals, []channels.Channel{}, input, prevTokenData)
 		if err != nil {
 			return nil, err
 		}
 
 		retRemaining := retResToken.Block().Remaining()
-		_, _, err = app.executeToken(previous, []channels.Channel{}, retRemaining, prevTokenData)
+		_, _, err = app.executeToken(previous, externals, []channels.Channel{}, retRemaining, prevTokenData)
 		if err != nil {
 			return nil, err
 		}
@@ -125,13 +128,13 @@ func (app *application) executeChannels(
 		token tokens.Token,
 		next tokens.Token,
 	) ([]byte, error) {
-		retResToken, _, err := app.executeToken(next, []channels.Channel{}, input, prevTokenData)
+		retResToken, _, err := app.executeToken(next, externals, []channels.Channel{}, input, prevTokenData)
 		if err != nil {
 			return nil, err
 		}
 
 		afterNextRemaining := retResToken.Block().Remaining()
-		retResTokenSecond, _, err := app.executeToken(token, []channels.Channel{}, afterNextRemaining, prevTokenData)
+		retResTokenSecond, _, err := app.executeToken(token, externals, []channels.Channel{}, afterNextRemaining, prevTokenData)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +156,7 @@ func (app *application) executeChannels(
 			for _, oneChannel := range channelsList {
 				if !oneChannel.HasCondition() {
 					token := oneChannel.Token()
-					retResToken, _, err := app.executeToken(token, []channels.Channel{}, data, prevTokenData)
+					retResToken, _, err := app.executeToken(token, externals, []channels.Channel{}, data, prevTokenData)
 					if err != nil {
 						continue
 					}
@@ -208,6 +211,7 @@ func (app *application) executeChannels(
 
 func (app *application) executeReference(
 	refName string,
+	externals grammars.Externals,
 	channels []channels.Channel,
 	currentData []byte,
 	prevTokenData map[string]*tokenData,
@@ -220,7 +224,7 @@ func (app *application) executeReference(
 		}
 
 		token := tokenData.Token()
-		return app.executeToken(token, channels, currentData, prevTokenData)
+		return app.executeToken(token, externals, channels, currentData, prevTokenData)
 	}
 
 	str := fmt.Sprintf("the referenced token (name: %s) is NOT declared", refName)
@@ -229,13 +233,14 @@ func (app *application) executeReference(
 
 func (app *application) executeToken(
 	currentToken tokens.Token,
+	externals grammars.Externals,
 	channels []channels.Channel,
 	currentData []byte,
 	prevTokenData map[string]*tokenData,
 ) (results.Token, map[string]*tokenData, error) {
 	amountChannels := 0
 	if len(channels) > 0 {
-		remainingData, err := app.executeChannels(channels, currentData, prevTokenData)
+		remainingData, err := app.executeChannels(externals, channels, currentData, prevTokenData)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -249,14 +254,14 @@ func (app *application) executeToken(
 	prevTokenData[name] = createTokenData(currentToken, currentData)
 
 	lines := currentToken.Lines()
-	resultBlock, retTokenData, err := app.executeLines(lines, channels, currentData, prevTokenData)
+	resultBlock, retTokenData, err := app.executeLines(lines, externals, channels, currentData, prevTokenData)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	if len(channels) > 0 {
 		remaining := resultBlock.Remaining()
-		remDataAfterChannels, err := app.executeChannels(channels, remaining, prevTokenData)
+		remDataAfterChannels, err := app.executeChannels(externals, channels, remaining, prevTokenData)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -274,6 +279,7 @@ func (app *application) executeToken(
 
 func (app *application) executeLines(
 	lines tokens.Lines,
+	externals grammars.Externals,
 	channels []channels.Channel,
 	currentData []byte,
 	prevTokenData map[string]*tokenData,
@@ -282,7 +288,7 @@ func (app *application) executeLines(
 	remainingData := currentData
 	resultLines := []results.Line{}
 	for idx, oneLine := range list {
-		retElements, retTokenData, err := app.executeLine(oneLine, channels, remainingData, prevTokenData)
+		retElements, retTokenData, err := app.executeLine(oneLine, externals, channels, remainingData, prevTokenData)
 		if err != nil {
 			continue
 		}
@@ -309,6 +315,7 @@ func (app *application) executeLines(
 
 func (app *application) executeLine(
 	line tokens.Line,
+	externals grammars.Externals,
 	channels []channels.Channel,
 	currentData []byte,
 	prevTokenData map[string]*tokenData,
@@ -317,7 +324,7 @@ func (app *application) executeLine(
 	remainingData := currentData
 	elements := []results.ElementWithCardinality{}
 	for index, oneElementWithCard := range list {
-		retElWithCard, retTokenData, err := app.executeElementWithCardinality(oneElementWithCard, channels, remainingData, prevTokenData)
+		retElWithCard, retTokenData, err := app.executeElementWithCardinality(oneElementWithCard, externals, channels, remainingData, prevTokenData)
 		if err != nil {
 			str := fmt.Sprintf("there was an error while executing line (index: %d): error: %s", index, err.Error())
 			return nil, nil, errors.New(str)
@@ -333,6 +340,7 @@ func (app *application) executeLine(
 
 func (app *application) executeElementWithCardinality(
 	elementWithCard tokens.ElementWithCardinality,
+	externals grammars.Externals,
 	channels []channels.Channel,
 	currentData []byte,
 	prevTokenData map[string]*tokenData,
@@ -357,7 +365,7 @@ func (app *application) executeElementWithCardinality(
 			}
 		}
 
-		retRemainingData, retResultElement, retTokenData, err := app.executeElement(element, channels, remainingData, prevTokenData)
+		retRemainingData, retResultElement, retTokenData, err := app.executeElement(element, externals, channels, remainingData, prevTokenData)
 		if err != nil {
 			break
 		}
@@ -393,6 +401,7 @@ func (app *application) executeElementWithCardinality(
 
 func (app *application) executeElement(
 	element tokens.Element,
+	externals grammars.Externals,
 	channels []channels.Channel,
 	currentData []byte,
 	prevTokenData map[string]*tokenData,
@@ -421,7 +430,7 @@ func (app *application) executeElement(
 
 	if element.IsToken() {
 		token := element.Token()
-		resultToken, retTokenData, err := app.executeToken(token, channels, currentData, prevTokenData)
+		resultToken, retTokenData, err := app.executeToken(token, externals, channels, currentData, prevTokenData)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -434,8 +443,37 @@ func (app *application) executeElement(
 		return resultToken.Block().Remaining(), ins, retTokenData, nil
 	}
 
+	if element.IsExternal() {
+		name := element.External()
+		external, err := externals.Find(name)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		grammar := external.Grammar()
+		result, err := app.Execute(grammar, currentData, false)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		resultToken := result.Token()
+		resultTokenBlock := resultToken.Block()
+		resultTokenChannels := resultToken.Channels()
+		token, err := app.resultTokenBuilder.Create().WithName(name).WithBlock(resultTokenBlock).WithChannels(resultTokenChannels).Now()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		ins, err := elementBuilder.WithToken(token).Now()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		return resultTokenBlock.Remaining(), ins, prevTokenData, nil
+	}
+
 	reference := element.Reference()
-	resultToken, retTokenData, err := app.executeReference(reference, channels, currentData, prevTokenData)
+	resultToken, retTokenData, err := app.executeReference(reference, externals, channels, currentData, prevTokenData)
 	if err != nil {
 		return nil, nil, nil, err
 	}

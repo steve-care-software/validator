@@ -8,14 +8,16 @@ import (
 )
 
 type builder struct {
-	root     tokens.Token
-	channels channels.Channels
+	root      tokens.Token
+	channels  channels.Channels
+	externals Externals
 }
 
 func createBuilder() Builder {
 	out := builder{
-		root:     nil,
-		channels: nil,
+		root:      nil,
+		channels:  nil,
+		externals: nil,
 	}
 
 	return &out
@@ -38,10 +40,24 @@ func (app *builder) WithChannels(channels channels.Channels) Builder {
 	return app
 }
 
+// WithExternals add externals to the builder
+func (app *builder) WithExternals(externals Externals) Builder {
+	app.externals = externals
+	return app
+}
+
 // Now builds a new Grammar instance
 func (app *builder) Now() (Grammar, error) {
 	if app.root == nil {
 		return nil, errors.New("the root token is mandatory in order to build a Grammar instance")
+	}
+
+	if app.channels != nil && app.externals != nil {
+		return createGrammarWithChannelsAndExternals(app.root, app.channels, app.externals), nil
+	}
+
+	if app.externals != nil {
+		return createGrammarWithExternals(app.root, app.externals), nil
 	}
 
 	if app.channels != nil {

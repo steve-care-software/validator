@@ -3,7 +3,199 @@ package applications
 import (
 	"reflect"
 	"testing"
+
+	"github.com/steve-care-software/validator/domain/grammars"
 )
+
+func TestValidator_withExternal_isSuccess(t *testing.T) {
+	tokenName := "digit"
+	externalScript := `
+		%rootToken;
+		rootToken : .number+
+				  ;
+
+		number	: .zero
+				| .one
+				| .two
+				| .three
+				| .four
+				| .five
+				| .six
+				| .seven
+				| .height
+				| .nine
+				;
+
+		zero: $48;
+		one: $49;
+		two: $50;
+		three: $51;
+		four: $52;
+		five: $53;
+		six: $54;
+		seven: $55;
+		height: $56;
+		nine: $57;
+		space: $32;
+		endOfLine: $10;
+	`
+
+	script := `
+		%rootToken;
+		-space;
+		-endOfLine;
+
+		rootToken : .openParenthesis .rootToken .closeParenthesis
+				  | .digit
+				  ;
+
+		openParenthesis: $40;
+		closeParenthesis: $41;
+		space: $32;
+		endOfLine: $10;
+	`
+
+	externalApplication, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	externalGrammar, err := externalApplication.Compile(externalScript)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	external, err := grammars.NewExternalBuilder().Create().WithToken(tokenName).WithGrammar(externalGrammar).Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	externals, err := grammars.NewExternalsBuilder().Create().WithList([]grammars.External{
+		external,
+	}).Now()
+
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	application, err := NewBuilder().Create().WithExternals(externals).Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	grammar, err := application.Compile(script)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	data := []byte("(45)")
+	result, err := application.Execute(grammar, data, false)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	path := result.Token().Path()
+	expectedPath := []string{"rootToken", "openParenthesis", "rootToken", "digit", "number", "four", "number", "five", "closeParenthesis"}
+	if !reflect.DeepEqual(expectedPath, path) {
+		t.Errorf("the path was expected to be %v, %v returned", expectedPath, path)
+		return
+	}
+}
+
+func TestValidator_withExternals_withInvalidExternalToken_returnsError(t *testing.T) {
+	tokenName := "digit"
+	externalScript := `
+		%rootToken;
+		rootToken : .number+
+				  ;
+
+		number	: .zero
+				| .one
+				| .two
+				| .three
+				| .four
+				| .five
+				| .six
+				| .seven
+				| .height
+				| .nine
+				;
+
+		zero: $48;
+		one: $49;
+		two: $50;
+		three: $51;
+		four: $52;
+		five: $53;
+		six: $54;
+		seven: $55;
+		height: $56;
+		nine: $57;
+		space: $32;
+		endOfLine: $10;
+	`
+
+	script := `
+		%rootToken;
+		-space;
+		-endOfLine;
+
+		rootToken : .openParenthesis .rootToken .closeParenthesis
+				  | .invalidExternal
+				  ;
+
+		openParenthesis: $40;
+		closeParenthesis: $41;
+		space: $32;
+		endOfLine: $10;
+	`
+
+	externalApplication, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	externalGrammar, err := externalApplication.Compile(externalScript)
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	external, err := grammars.NewExternalBuilder().Create().WithToken(tokenName).WithGrammar(externalGrammar).Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	externals, err := grammars.NewExternalsBuilder().Create().WithList([]grammars.External{
+		external,
+	}).Now()
+
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	application, err := NewBuilder().Create().WithExternals(externals).Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
+	_, err = application.Compile(script)
+	if err == nil {
+		t.Errorf("the error was expected to be valid, nil, returned")
+		return
+	}
+}
 
 func TestValidator_withReference_withSuccessIndex_withChannels_isSuccess(t *testing.T) {
 	script := `
@@ -29,14 +221,19 @@ func TestValidator_withReference_withSuccessIndex_withChannels_isSuccess(t *test
 	`
 
 	data := []byte("(*( 5 *< 5 )+) 567")
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
 	}
 
-	result, err := NewApplication().Execute(grammar, data, true)
+	result, err := application.Execute(grammar, data, true)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
 		return
@@ -75,7 +272,12 @@ func TestValidator_withReference_withSuccessIndex_isSuccess(t *testing.T) {
 	`
 
 	data := []byte("((5<5))567")
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -121,7 +323,12 @@ func TestValidator_withReference_withSuccessIndex_notEnoughData_cannotHavePrefix
 	`
 
 	data := []byte("((5<5)")
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -173,7 +380,12 @@ func TestValidator_withReference_withSuccessIndex_notEnoughData_withPrefix_isSuc
 	`
 
 	data := []byte("((5<5)")
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -218,7 +430,12 @@ func TestValidator_withReference_isInfiniteRecursive_isNotSuccess(t *testing.T) 
 	`
 
 	data := []byte("((5<5))")
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -260,7 +477,12 @@ func TestValidator_withOneLine_withSpecificCardinality_withSubTokens_withSuccess
 	`
 
 	data := []byte("(-)345")
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -299,7 +521,12 @@ func TestValidator_withOneLine_withSpecificCardinality_withByte_withoutSuccessIn
 		openParenthesis : $40;
 	`
 
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -338,7 +565,12 @@ func TestValidator_withOneLine_withMinimumCardinality_withByte_withExactlyMinOcc
 		openParenthesis : $40[2,];
 	`
 
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -376,7 +608,12 @@ func TestValidator_withOneLine_withMinimumCardinality_withByte_withMinimumPlusOc
 		openParenthesis : $40[2,];
 	`
 
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -414,7 +651,12 @@ func TestValidator_withOneLine_withMinimumCardinality_withByte_withLessThanMinim
 		openParenthesis : $40[2,];
 	`
 
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -452,7 +694,12 @@ func TestValidator_withOneLine_withRangeCardinality_withByte_withMaximumExcceede
 		openParenthesis : $40[2,5];
 	`
 
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -496,7 +743,12 @@ func TestValidator_withOneLine_withRangeCardinality_withByte_withExactlyMaximumO
 		openParenthesis : $40[2,5];
 	`
 
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
@@ -534,7 +786,12 @@ func TestValidator_withOneLine_withRangeCardinality_withByte_withinRangeOccurenc
 		openParenthesis : $40[2,5];
 	`
 
-	application := NewApplication()
+	application, err := NewBuilder().Create().Now()
+	if err != nil {
+		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())
+		return
+	}
+
 	grammar, err := application.Compile(script)
 	if err != nil {
 		t.Errorf("the error was expected to be nil, error returned: %s", err.Error())

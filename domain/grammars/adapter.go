@@ -12,6 +12,7 @@ import (
 
 type adapter struct {
 	grammarBuilder                Builder
+	externalsBuilder              ExternalsBuilder
 	channelsBuilder               channels.Builder
 	channelBuilder                channels.ChannelBuilder
 	conditionBuilder              channels.ConditionBuilder
@@ -37,10 +38,12 @@ type adapter struct {
 	commentSuffix                 byte
 	tokenNameCharacters           []byte
 	channelCharacters             []byte
+	externals                     Externals
 }
 
 func createAdapter(
 	grammarBuilder Builder,
+	externalsBuilder ExternalsBuilder,
 	channelsBuilder channels.Builder,
 	channelBuilder channels.ChannelBuilder,
 	conditionBuilder channels.ConditionBuilder,
@@ -67,8 +70,133 @@ func createAdapter(
 	tokenNameCharacters []byte,
 	channelCharacters []byte,
 ) Adapter {
+	return createAdapterInternally(
+		grammarBuilder,
+		externalsBuilder,
+		channelsBuilder,
+		channelBuilder,
+		conditionBuilder,
+		tokenBuilder,
+		linesBuilder,
+		lineBuilder,
+		elementWithCardinalityBuilder,
+		elementBuilder,
+		cardinalityAdapter,
+		rootPrefix,
+		rootSuffix,
+		channelPrefix,
+		channelSuffix,
+		channelConditionPrevious,
+		channelConditionNext,
+		channelConditionAnd,
+		tokenNamePrefix,
+		bytePrefix,
+		linesPrefix,
+		linesSuffix,
+		lineDelimiter,
+		commentPrefix,
+		commentSuffix,
+		tokenNameCharacters,
+		channelCharacters,
+		nil,
+	)
+}
+
+func createAdapterWithExternals(
+	grammarBuilder Builder,
+	externalsBuilder ExternalsBuilder,
+	channelsBuilder channels.Builder,
+	channelBuilder channels.ChannelBuilder,
+	conditionBuilder channels.ConditionBuilder,
+	tokenBuilder tokens.TokenBuilder,
+	linesBuilder tokens.LinesBuilder,
+	lineBuilder tokens.LineBuilder,
+	elementWithCardinalityBuilder tokens.ElementWithCardinalityBuilder,
+	elementBuilder tokens.ElementBuilder,
+	cardinalityAdapter cardinality.Adapter,
+	rootPrefix byte,
+	rootSuffix byte,
+	channelPrefix byte,
+	channelSuffix byte,
+	channelConditionPrevious byte,
+	channelConditionNext byte,
+	channelConditionAnd byte,
+	tokenNamePrefix byte,
+	bytePrefix byte,
+	linesPrefix byte,
+	linesSuffix byte,
+	lineDelimiter byte,
+	commentPrefix byte,
+	commentSuffix byte,
+	tokenNameCharacters []byte,
+	channelCharacters []byte,
+	externals Externals,
+) Adapter {
+	return createAdapterInternally(
+		grammarBuilder,
+		externalsBuilder,
+		channelsBuilder,
+		channelBuilder,
+		conditionBuilder,
+		tokenBuilder,
+		linesBuilder,
+		lineBuilder,
+		elementWithCardinalityBuilder,
+		elementBuilder,
+		cardinalityAdapter,
+		rootPrefix,
+		rootSuffix,
+		channelPrefix,
+		channelSuffix,
+		channelConditionPrevious,
+		channelConditionNext,
+		channelConditionAnd,
+		tokenNamePrefix,
+		bytePrefix,
+		linesPrefix,
+		linesSuffix,
+		lineDelimiter,
+		commentPrefix,
+		commentSuffix,
+		tokenNameCharacters,
+		channelCharacters,
+		externals,
+	)
+}
+
+func createAdapterInternally(
+	grammarBuilder Builder,
+	externalsBuilder ExternalsBuilder,
+	channelsBuilder channels.Builder,
+	channelBuilder channels.ChannelBuilder,
+	conditionBuilder channels.ConditionBuilder,
+	tokenBuilder tokens.TokenBuilder,
+	linesBuilder tokens.LinesBuilder,
+	lineBuilder tokens.LineBuilder,
+	elementWithCardinalityBuilder tokens.ElementWithCardinalityBuilder,
+	elementBuilder tokens.ElementBuilder,
+	cardinalityAdapter cardinality.Adapter,
+	rootPrefix byte,
+	rootSuffix byte,
+	channelPrefix byte,
+	channelSuffix byte,
+	channelConditionPrevious byte,
+	channelConditionNext byte,
+	channelConditionAnd byte,
+	tokenNamePrefix byte,
+	bytePrefix byte,
+	linesPrefix byte,
+	linesSuffix byte,
+	lineDelimiter byte,
+	commentPrefix byte,
+	commentSuffix byte,
+	tokenNameCharacters []byte,
+	channelCharacters []byte,
+	externals Externals,
+) Adapter {
 	out := adapter{
 		grammarBuilder:                grammarBuilder,
+		externalsBuilder:              externalsBuilder,
 		channelsBuilder:               channelsBuilder,
 		channelBuilder:                channelBuilder,
 		conditionBuilder:              conditionBuilder,
@@ -94,6 +222,7 @@ func createAdapter(
 		commentSuffix:                 commentSuffix,
 		tokenNameCharacters:           tokenNameCharacters,
 		channelCharacters:             channelCharacters,
+		externals:                     externals,
 	}
 
 	return &out
@@ -142,7 +271,75 @@ func (app *adapter) ToGrammar(script string) (Grammar, error) {
 		builder.WithChannels(channels)
 	}
 
+	if app.externals != nil {
+		externals, err := app.toExternals(rootToken)
+		if err != nil {
+			return nil, err
+		}
+
+		builder.WithExternals(externals)
+	}
+
 	return builder.Now()
+}
+
+func (app *adapter) toExternals(token tokens.Token) (Externals, error) {
+	list, err := app.toExternalsList(token)
+	if err != nil {
+		return nil, err
+	}
+
+	mp := map[string]External{}
+	for _, oneExternal := range list {
+		keyname := oneExternal.Token()
+		mp[keyname] = oneExternal
+	}
+
+	uniques := []External{}
+	for _, oneExternal := range mp {
+		uniques = append(uniques, oneExternal)
+	}
+
+	return app.externalsBuilder.Create().WithList(uniques).Now()
+}
+
+func (app *adapter) toExternalsList(token tokens.Token) ([]External, error) {
+	list := []External{}
+	lines := token.Lines().List()
+	for _, oneLine := range lines {
+		elementsWithCard := oneLine.List()
+		for _, oneElementWithCard := range elementsWithCard {
+			element := oneElementWithCard.Element()
+			if element.IsByte() {
+				continue
+			}
+
+			if element.IsReference() {
+				continue
+			}
+
+			if element.IsToken() {
+				token := element.Token()
+				subExternals, err := app.toExternalsList(token)
+				if err != nil {
+					return nil, err
+				}
+
+				list = append(list, subExternals...)
+				continue
+			}
+
+			name := element.External()
+			external, err := app.externals.Find(name)
+			if err != nil {
+				return nil, err
+			}
+
+			list = append(list, external)
+		}
+	}
+
+	return list, nil
 }
 
 func (app *adapter) toChannels(channelBytes map[int][]byte, scriptTokensMap map[string]*scriptToken) (channels.Channels, error) {
@@ -242,6 +439,25 @@ func (app *adapter) toToken(rootTokenName string, scriptTokensMap map[string]*sc
 
 					elementsList = append(elementsList, elementWithCard)
 					continue
+				}
+
+				if app.externals != nil {
+					external, err := app.externals.Find(oneValue.tokenName)
+					if err == nil {
+						tokenName := external.Token()
+						element, err := app.elementBuilder.Create().WithExternal(tokenName).Now()
+						if err != nil {
+							return nil, err
+						}
+
+						elementWithCard, err := app.elementWithCardinalityBuilder.Create().WithElement(element).WithCardinality(oneValue.cardinality).Now()
+						if err != nil {
+							return nil, err
+						}
+
+						elementsList = append(elementsList, elementWithCard)
+						continue
+					}
 				}
 
 				isReference := false
@@ -391,6 +607,15 @@ func (app *adapter) toScriptToken(input []byte) (*scriptToken, []byte, error) {
 	tokenName, remainingAfterTokenName, err := app.fetchTokenName(input[0:])
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// make sure the token name is not already declared as an external token:
+	if app.externals != nil {
+		_, err = app.externals.Find(tokenName)
+		if err == nil {
+			str := fmt.Sprintf("the token (name: %s) cannot be declared because it is already declared as an external token", tokenName)
+			return nil, nil, errors.New(str)
+		}
 	}
 
 	scriptLines, remainingAfterLines, err := app.fetchLines(remainingAfterTokenName)

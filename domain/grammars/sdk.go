@@ -6,9 +6,10 @@ import (
 	"github.com/steve-care-software/validator/domain/grammars/tokens"
 )
 
-// NewAdapter creates a new adapter
-func NewAdapter() Adapter {
+// NewAdapterBuilder creates a new adapter builder
+func NewAdapterBuilder() AdapterBuilder {
 	grammarBuilder := NewBuilder()
+	externalsBuilder := NewExternalsBuilder()
 	channelsBuilder := channels.NewBuilder()
 	channelBuilder := channels.NewChannelBuilder()
 	conditionBuilder := channels.NewConditionBuilder()
@@ -40,8 +41,9 @@ func NewAdapter() Adapter {
 		[]byte(" ")[0],
 	}
 
-	return createAdapter(
+	return createAdapterBuilder(
 		grammarBuilder,
+		externalsBuilder,
 		channelsBuilder,
 		channelBuilder,
 		conditionBuilder,
@@ -75,6 +77,23 @@ func NewBuilder() Builder {
 	return createBuilder()
 }
 
+// NewExternalsBuilder creates a new externals builder
+func NewExternalsBuilder() ExternalsBuilder {
+	return createExternalsBuilder()
+}
+
+// NewExternalBuilder creates a new external builder
+func NewExternalBuilder() ExternalBuilder {
+	return createExternalBuilder()
+}
+
+// AdapterBuilder represents an adapter builder
+type AdapterBuilder interface {
+	Create() AdapterBuilder
+	WithExternals(externals Externals) AdapterBuilder
+	Now() (Adapter, error)
+}
+
 // Adapter represents the grammar adapter
 type Adapter interface {
 	ToGrammar(script string) (Grammar, error)
@@ -85,6 +104,7 @@ type Builder interface {
 	Create() Builder
 	WithRoot(root tokens.Token) Builder
 	WithChannels(channels channels.Channels) Builder
+	WithExternals(externals Externals) Builder
 	Now() (Grammar, error)
 }
 
@@ -93,4 +113,33 @@ type Grammar interface {
 	Root() tokens.Token
 	HasChannels() bool
 	Channels() channels.Channels
+	HasExternals() bool
+	Externals() Externals
+}
+
+// ExternalsBuilder represents an externals builder
+type ExternalsBuilder interface {
+	Create() ExternalsBuilder
+	WithList(list []External) ExternalsBuilder
+	Now() (Externals, error)
+}
+
+// Externals represents externals
+type Externals interface {
+	List() []External
+	Find(name string) (External, error)
+}
+
+// ExternalBuilder represents an external builder
+type ExternalBuilder interface {
+	Create() ExternalBuilder
+	WithToken(token string) ExternalBuilder
+	WithGrammar(grammar Grammar) ExternalBuilder
+	Now() (External, error)
+}
+
+// External represents an external token
+type External interface {
+	Token() string
+	Grammar() Grammar
 }

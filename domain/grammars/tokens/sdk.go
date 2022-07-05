@@ -130,6 +130,7 @@ type ElementBuilder interface {
 	WithByte(byteValue byte) ElementBuilder
 	WithToken(token Token) ElementBuilder
 	WithReference(reference string) ElementBuilder
+	WithExternal(external string) ElementBuilder
 	Now() (Element, error)
 }
 
@@ -141,4 +142,6 @@ type Element interface {
 	Token() Token
 	IsReference() bool
 	Reference() string
+	IsExternal() bool
+	External() string
 }

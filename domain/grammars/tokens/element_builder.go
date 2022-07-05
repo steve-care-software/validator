@@ -6,6 +6,7 @@ type elementBuilder struct {
 	pByte     *byte
 	token     Token
 	reference string
+	external  string
 }
 
 func createElementBuilder() ElementBuilder {
@@ -13,6 +14,7 @@ func createElementBuilder() ElementBuilder {
 		pByte:     nil,
 		token:     nil,
 		reference: "",
+		external:  "",
 	}
 
 	return &out
@@ -41,6 +43,12 @@ func (app *elementBuilder) WithReference(reference string) ElementBuilder {
 	return app
 }
 
+// WithExternal adds an external token to the builder
+func (app *elementBuilder) WithExternal(external string) ElementBuilder {
+	app.external = external
+	return app
+}
+
 // Now builds a new Element instance
 func (app *elementBuilder) Now() (Element, error) {
 	if app.pByte != nil {
@@ -53,6 +61,10 @@ func (app *elementBuilder) Now() (Element, error) {
 
 	if app.reference != "" {
 		return createElementWithReference(app.reference), nil
+	}
+
+	if app.external != "" {
+		return createElementWithExternal(app.external), nil
 	}
 
 	return nil, errors.New("the Element is invalid")

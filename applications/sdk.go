@@ -5,17 +5,17 @@ import (
 	"github.com/steve-care-software/validator/domain/results"
 )
 
-// NewApplication creates a new application
-func NewApplication() Application {
-	grammarAdapter := grammars.NewAdapter()
+// NewBuilder creates a new application builder
+func NewBuilder() Builder {
+	grammarAdapterBuilder := grammars.NewAdapterBuilder()
 	resultBuilder := results.NewBuilder()
 	resultTokenBuilder := results.NewTokenBuilder()
 	resultBlockBuilder := results.NewBlockBuilder()
 	resultLineBuilder := results.NewLineBuilder()
 	resultElementWithCardinalityBuilder := results.NewElementWithCardinalityBuilder()
 	resultElementBuilder := results.NewElementBuilder()
-	return createApplication(
-		grammarAdapter,
+	return createBuilder(
+		grammarAdapterBuilder,
 		resultBuilder,
 		resultTokenBuilder,
 		resultBlockBuilder,
@@ -23,6 +23,13 @@ func NewApplication() Application {
 		resultElementWithCardinalityBuilder,
 		resultElementBuilder,
 	)
+}
+
+// Builder represents an application builder
+type Builder interface {
+	Create() Builder
+	WithExternals(externals grammars.Externals) Builder
+	Now() (Application, error)
 }
 
 // Application represents the grammar application
